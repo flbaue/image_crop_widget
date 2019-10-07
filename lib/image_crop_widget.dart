@@ -54,12 +54,12 @@ class ImageCropState extends State<ImageCrop> {
     );
 
     final picture = recorder.endRecording();
-    final cropedImage = await picture.toImage(
+    final croppedImage = await picture.toImage(
       imageCropRect.width.toInt(),
       imageCropRect.height.toInt(),
     );
 
-    return cropedImage;
+    return croppedImage;
   }
 
   _SharedCropState _state = _SharedCropState();
