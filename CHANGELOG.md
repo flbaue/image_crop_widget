@@ -1,3 +1,7 @@
+## [0.0.3] - 2019-10-08.
+
+Fixed the image link inside the readme.
+
 ## [0.0.2] - 2019-10-08.
 
 Added a new example.

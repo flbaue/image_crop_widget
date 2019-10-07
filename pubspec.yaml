@@ -1,6 +1,6 @@
 name: image_crop_widget
 description: A Flutter widget to crop images. The widget is completely written in Dart and has minimal dependencies.
-version: 0.0.2
+version: 0.0.3
 author: "Florian Bauer <florian.bauer@posteo.de>"
 homepage: https://github.com/flbaue/image_crop_widget
 
