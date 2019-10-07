@@ -4,7 +4,7 @@ A Flutter widget to crop images. The widget is completely written in Dart and ha
 
 The widget displays the image within the given layout space. On top of the image a transparent rectangular overlay, with handles on each corner, is drawn. The overlay handles can be dragged by touch to adjust the cropping area.
 
-![Example](/assets/example.png)
+![Example](https://github.com/flbaue/image_crop_widget/raw/master/assets/example.png)
 
 By calling the `cropImage()` method on the widget's state object, the image area that is marked by the overlay is returned as a new image object.
 
