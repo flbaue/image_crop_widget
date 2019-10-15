@@ -20,6 +20,27 @@ class ImageCrop extends StatefulWidget {
 }
 
 class ImageCropState extends State<ImageCrop> {
+  /// Rotates the image clockwise by 90 degree.
+  /// Completes when the rotation is done.
+  Future<void> rotateImage() async {
+    var pictureRecorder = ui.PictureRecorder();
+    Canvas canvas = Canvas(pictureRecorder);
+
+    canvas.rotate(pi / 2);
+    canvas.translate(-0, -_state.image.height.toDouble());
+    canvas.drawImage(_state.image, Offset.zero, Paint());
+
+    final image = await pictureRecorder
+        .endRecording()
+        .toImage(_state.image.height, _state.image.width);
+
+    setState(() {
+      _state.image = image;
+    });
+  }
+
+  /// Crops the image to the currently marked area.
+  /// Returns a new [ui.Image].
   Future<ui.Image> cropImage() async {
     final yOffset =
         (_state.widgetSize.height - _state.fittedImageSize.destination.height) /
@@ -257,8 +278,9 @@ class _SharedCropState {
 
 class _ImagePainter extends CustomPainter {
   final _SharedCropState state;
+  final ui.Image image;
 
-  _ImagePainter(this.state);
+  _ImagePainter(this.state) : image = state.image;
 
   @override
   void paint(ui.Canvas canvas, ui.Size size) {
@@ -288,7 +310,7 @@ class _ImagePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ImagePainter oldDelegate) {
-    return state.image != oldDelegate.state.image;
+    return image != oldDelegate.image;
   }
 }
 
