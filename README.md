@@ -23,7 +23,7 @@ Image imageObject = ...
 ImageCrop(key: key, image: imageObject) // This could be used inside a  build method.
 
 ...
-
+await key.currentState.rotateImage(); // Rotate the image be 90° clockwise.
 final cropedImage = await key.currentState.cropImage(); // This could be used inside a 'onPress' handler method.
 ```
 
@@ -36,4 +36,29 @@ Uint8List bytes = ...
 final codec = await instantiateImageCodec(bytes);
 final frame = await codec.getNextFrame();
 final image = frame.image;
+```
+
+## How to display an image object
+
+The `Image` object can be displayed with the Flutter `Image` widget. One way to do this, is by converting the image into a `Uint8List` and pass it into the widget's memory constructor. Please note, that the widget is not the same `Image` class as the image object itself.
+
+```Dart
+final cropedImage = await key.currentState.cropImage();
+final byte = await cropedImage.toByteData(format: ui.ImageByteFormat.png);
+final byteList = byte.buffer.asUint8List();
+
+Image.memory(byteList)
+```
+
+## How to persist an image object
+
+The `Image` object can be persisted into a file or a database. To do this, you can convert the image object into a `Uint8List` and write it into a `File` or your database object.
+
+```Dart
+final cropedImage = await key.currentState.cropImage();
+final byte = await cropedImage.toByteData(format: ui.ImageByteFormat.png);
+final byteList = byte.buffer.asUint8List();
+
+final imageFile = File("Some path and filename"); // You can use the path_provider package to locate the right path.
+final result = await imageFile.writeAsBytes(byteList);
 ```
