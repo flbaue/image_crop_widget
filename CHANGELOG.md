@@ -1,3 +1,8 @@
+## [0.0.5] - 2019-10-30.
+
+- Made the crop rect moveable.
+- Corners will not jump anymore, when the touch event was not centered on them.
+
 ## [0.0.4] - 2019-10-08.
 
 Added image rotation method.
