@@ -1,3 +1,8 @@
+## [0.0.6] - 2019-11-01.
+
+- Super smooth touch recognition.
+- Refactoring
+
 ## [0.0.5] - 2019-10-30.
 
 - Made the crop rect moveable.
