@@ -8,6 +8,10 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
+import 'src/crop_area.dart';
+import 'src/crop_area_touch_handler.dart';
+import 'src/pan_gesture_recognizer.dart';
+
 class ImageCrop extends StatefulWidget {
   final ui.Image image;
 
@@ -50,11 +54,11 @@ class ImageCropState extends State<ImageCrop> {
             2.0;
     final fittedCropRect = Rect.fromCenter(
       center: Offset(
-        _state.cropRect.center.dx - xOffset,
-        _state.cropRect.center.dy - yOffset,
+        _state.cropArea.cropRect.center.dx - xOffset,
+        _state.cropArea.cropRect.center.dy - yOffset,
       ),
-      width: _state.cropRect.width,
-      height: _state.cropRect.height,
+      width: _state.cropArea.cropRect.width,
+      height: _state.cropArea.cropRect.height,
     );
 
     final scale =
@@ -89,6 +93,20 @@ class ImageCropState extends State<ImageCrop> {
   void initState() {
     super.initState();
     _state.image = widget.image;
+    _state.cropArea = CropArea();
+    _state.cropAreaTouchHandler =
+        CropAreaTouchHandler(cropArea: _state.cropArea);
+  }
+
+  void _onPanUpdate(PointerEvent event) {
+    _onUpdate(event.position);
+  }
+
+  void _onPanEnd(PointerEvent event) {
+    setState(() {
+      _state.lastTouchPosition = null;
+      _state.touchPosition = null;
+    });
   }
 
   @override
@@ -97,33 +115,21 @@ class ImageCropState extends State<ImageCrop> {
       width: double.infinity,
       height: double.infinity,
       color: Colors.black87,
-      child: GestureDetector(
-        child: CustomPaint(
-          painter: _ImagePainter(_state),
-          foregroundPainter: _OverlayPainter(_state),
+      child: CustomPaint(
+        painter: _ImagePainter(_state),
+        foregroundPainter: _OverlayPainter(_state),
+        child: RawGestureDetector(
+          gestures: {
+            PanGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
+              () => PanGestureRecognizer(
+                onPanUpdate: _onPanUpdate,
+                onPanEnd: _onPanEnd,
+              ),
+              (PanGestureRecognizer instance) {},
+            )
+          },
         ),
-        onPanDown: (event) {
-          _onUpdate(event.globalPosition);
-        },
-        onPanStart: (event) {
-          _onUpdate(event.globalPosition);
-        },
-        onPanUpdate: (event) {
-          _onUpdate(event.globalPosition);
-        },
-        onPanEnd: (event) {
-          setState(() {
-            _state.lastTouchPosition = null;
-            _state.touchPosition = null;
-          });
-        },
-        onPanCancel: () {
-          setState(() {
-            _state.lastTouchPosition = null;
-            _state.touchPosition = null;
-          });
-        },
-        onDoubleTap: () => cropImage(),
       ),
     );
   }
@@ -133,239 +139,13 @@ class ImageCropState extends State<ImageCrop> {
     _state.lastTouchPosition = _state.touchPosition;
     _state.touchPosition = renderBox.globalToLocal(globalPosition);
 
-    _updateCorners();
+    if (_state.lastTouchPosition == null) {
+      _state.cropAreaTouchHandler.startTouch(_state.touchPosition);
+    } else {
+      _state.cropAreaTouchHandler.updateTouch(_state.touchPosition);
+    }
+
     setState(() {});
-  }
-
-  void _updateCorners() {
-    // Update corner rects
-    if (_state.topLeft == null ||
-        _state.topLeft.center != _state.cropRect.topLeft) {
-      _state.topLeft = Rect.fromCenter(
-          center: _state.cropRect.topLeft, width: 32, height: 32);
-    }
-
-    if (_state.topRight == null ||
-        _state.topRight.center != _state.cropRect.topRight) {
-      _state.topRight = Rect.fromCenter(
-          center: _state.cropRect.topRight, width: 32, height: 32);
-    }
-
-    if (_state.bottomLeft == null ||
-        _state.bottomLeft.center != _state.cropRect.bottomLeft) {
-      _state.bottomLeft = Rect.fromCenter(
-          center: _state.cropRect.bottomLeft, width: 32, height: 32);
-    }
-
-    if (_state.bottomRight == null ||
-        _state.bottomRight.center != _state.cropRect.bottomRight) {
-      _state.bottomRight = Rect.fromCenter(
-          center: _state.cropRect.bottomRight, width: 32, height: 32);
-    }
-
-    // Activate rect
-    if (_state.lastTouchPosition == null && _state.touchPosition != null) {
-      _state.topLeftActive = _state.topLeft.contains(_state.touchPosition);
-      _state.topRightActive = _state.topRight.contains(_state.touchPosition);
-      _state.bottomLeftActive =
-          _state.bottomLeft.contains(_state.touchPosition);
-      _state.bottomRightActive =
-          _state.bottomRight.contains(_state.touchPosition);
-
-      if (_state.topLeftActive ||
-          _state.topRightActive ||
-          _state.bottomLeftActive ||
-          _state.bottomRightActive) {
-        _state.cropRectActive = false;
-      } else {
-        _state.cropRectActive = _state.cropRect.contains(_state.touchPosition);
-      }
-
-      // Calculate touch offset
-      if (_state.topLeftActive) {
-        _state.touchToActiveRectOffset =
-            _state.topLeft.center - _state.touchPosition;
-      } else if (_state.topRightActive) {
-        _state.touchToActiveRectOffset =
-            _state.topRight.center - _state.touchPosition;
-      } else if (_state.bottomLeftActive) {
-        _state.touchToActiveRectOffset =
-            _state.bottomLeft.center - _state.touchPosition;
-      } else if (_state.bottomRightActive) {
-        _state.touchToActiveRectOffset =
-            _state.bottomRight.center - _state.touchPosition;
-      } else if (_state.cropRectActive) {
-        _state.touchToActiveRectOffset =
-            _state.cropRect.center - _state.touchPosition;
-      }
-    }
-
-    // Move crop rect
-    if (_state.touchPosition != null) {
-      if (_state.topLeftActive) {
-        _state.cropRect = Rect.fromLTRB(
-          min(
-            max(
-              _state.touchPosition.dx + _state.touchToActiveRectOffset.dx,
-              _state.horizontalSpacing,
-            ),
-            _state.cropRect.right - 64,
-          ),
-          min(
-            max(
-              _state.touchPosition.dy + _state.touchToActiveRectOffset.dy,
-              _state.verticalSpacing,
-            ),
-            _state.cropRect.bottom - 64,
-          ),
-          _state.cropRect.right,
-          _state.cropRect.bottom,
-        );
-      } else if (_state.topRightActive) {
-        _state.cropRect = Rect.fromLTRB(
-          _state.cropRect.left,
-          min(
-            max(
-              _state.touchPosition.dy + _state.touchToActiveRectOffset.dy,
-              _state.verticalSpacing,
-            ),
-            _state.cropRect.bottom - 64,
-          ),
-          max(
-            min(
-              _state.touchPosition.dx + _state.touchToActiveRectOffset.dx,
-              _state.widgetSize.width - _state.horizontalSpacing,
-            ),
-            _state.cropRect.left + 64,
-          ),
-          _state.cropRect.bottom,
-        );
-      } else if (_state.bottomLeftActive) {
-        _state.cropRect = Rect.fromLTRB(
-          min(
-            max(
-              _state.touchPosition.dx + _state.touchToActiveRectOffset.dx,
-              _state.horizontalSpacing,
-            ),
-            _state.cropRect.right - 64,
-          ),
-          _state.cropRect.top,
-          _state.cropRect.right,
-          max(
-            min(
-              _state.touchPosition.dy + _state.touchToActiveRectOffset.dy,
-              _state.widgetSize.height - _state.verticalSpacing,
-            ),
-            _state.cropRect.top + 64,
-          ),
-        );
-      } else if (_state.bottomRightActive) {
-        _state.cropRect = Rect.fromLTRB(
-          _state.cropRect.left,
-          _state.cropRect.top,
-          max(
-            min(
-              _state.touchPosition.dx + _state.touchToActiveRectOffset.dx,
-              _state.widgetSize.width - _state.horizontalSpacing,
-            ),
-            _state.cropRect.left + 64,
-          ),
-          max(
-            min(
-              _state.touchPosition.dy + _state.touchToActiveRectOffset.dy,
-              _state.widgetSize.height - _state.verticalSpacing,
-            ),
-            _state.cropRect.top + 64,
-          ),
-        );
-      } else if (_state.cropRectActive) {
-        final center = _state.touchPosition + _state.touchToActiveRectOffset;
-        final newRect = Rect.fromCenter(
-            center: center,
-            width: _state.cropRect.width,
-            height: _state.cropRect.height);
-
-        final boundsRect = _state.imageContainingRect;
-
-        if (newRect.left >= boundsRect.left &&
-            newRect.top >= boundsRect.top &&
-            newRect.right <= boundsRect.right &&
-            newRect.bottom <= boundsRect.bottom) {
-          _state.cropRect = newRect;
-        } else if (newRect.left < boundsRect.left &&
-            newRect.top >= boundsRect.top &&
-            newRect.right <= boundsRect.right &&
-            newRect.bottom <= boundsRect.bottom) {
-          //left
-          _state.cropRect = Rect.fromLTWH(boundsRect.left, newRect.top,
-              _state.cropRect.width, _state.cropRect.height);
-        } else if (newRect.left >= boundsRect.left &&
-            newRect.top < boundsRect.top &&
-            newRect.right <= boundsRect.right &&
-            newRect.bottom <= boundsRect.bottom) {
-          //top
-          _state.cropRect = Rect.fromLTWH(newRect.left, boundsRect.top,
-              _state.cropRect.width, _state.cropRect.height);
-        } else if (newRect.left < boundsRect.left &&
-            newRect.top < boundsRect.top &&
-            newRect.right <= boundsRect.right &&
-            newRect.bottom <= boundsRect.bottom) {
-          //top left
-          _state.cropRect = Rect.fromLTWH(boundsRect.left, boundsRect.top,
-              _state.cropRect.width, _state.cropRect.height);
-        } else if (newRect.left >= boundsRect.left &&
-            newRect.top < boundsRect.top &&
-            newRect.right > boundsRect.right &&
-            newRect.bottom <= boundsRect.bottom) {
-          //top right
-          _state.cropRect = Rect.fromLTWH(
-              boundsRect.right - _state.cropRect.width,
-              boundsRect.top,
-              _state.cropRect.width,
-              _state.cropRect.height);
-        } else if (newRect.left >= boundsRect.left &&
-            newRect.top >= boundsRect.top &&
-            newRect.right > boundsRect.right &&
-            newRect.bottom <= boundsRect.bottom) {
-          //right
-          _state.cropRect = Rect.fromLTWH(
-              boundsRect.right - _state.cropRect.width,
-              newRect.top,
-              _state.cropRect.width,
-              _state.cropRect.height);
-        } else if (newRect.left >= boundsRect.left &&
-            newRect.top >= boundsRect.top &&
-            newRect.right <= boundsRect.right &&
-            newRect.bottom > boundsRect.bottom) {
-          //bottom
-          _state.cropRect = Rect.fromLTWH(
-              newRect.left,
-              boundsRect.bottom - _state.cropRect.height,
-              _state.cropRect.width,
-              _state.cropRect.height);
-        } else if (newRect.left < boundsRect.left &&
-            newRect.top >= boundsRect.top &&
-            newRect.right <= boundsRect.right &&
-            newRect.bottom > boundsRect.bottom) {
-          //bottom left
-          _state.cropRect = Rect.fromLTWH(
-              boundsRect.left,
-              boundsRect.bottom - _state.cropRect.height,
-              _state.cropRect.width,
-              _state.cropRect.height);
-        } else if (newRect.left >= boundsRect.left &&
-            newRect.top >= boundsRect.top &&
-            newRect.right > boundsRect.right &&
-            newRect.bottom > boundsRect.bottom) {
-          //bottom right
-          _state.cropRect = Rect.fromLTWH(
-              boundsRect.right - _state.cropRect.width,
-              boundsRect.bottom - _state.cropRect.height,
-              _state.cropRect.width,
-              _state.cropRect.height);
-        }
-      }
-    }
   }
 }
 
@@ -373,9 +153,7 @@ class _SharedCropState {
   ui.Image image;
 
   Offset touchPosition;
-  Offset touchToActiveRectOffset;
   Offset lastTouchPosition;
-  Rect cropRect;
 
   Size widgetSize;
   Size imageSize;
@@ -384,15 +162,8 @@ class _SharedCropState {
   double verticalSpacing;
   Rect imageContainingRect;
 
-  Rect topLeft;
-  Rect topRight;
-  Rect bottomLeft;
-  Rect bottomRight;
-  bool topLeftActive = false;
-  bool topRightActive = false;
-  bool bottomLeftActive = false;
-  bool bottomRightActive = false;
-  bool cropRectActive = false;
+  CropArea cropArea;
+  CropAreaTouchHandler cropAreaTouchHandler;
 }
 
 class _ImagePainter extends CustomPainter {
@@ -446,24 +217,26 @@ class _OverlayPainter extends CustomPainter {
     ..strokeCap = StrokeCap.round
     ..color = Colors.white;
   final paintBackground = Paint()..color = Colors.white30;
-  _OverlayPainter(this._state) : _cropRect = _state.cropRect;
+
+  _OverlayPainter(this._state) : _cropRect = _state.cropArea.cropRect;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (_state.cropRect == null) {
-      _state.cropRect = Rect.fromCenter(
-          center: Offset(size.width / 2, size.height / 2),
-          width: 100,
-          height: 100);
+    if (_state.cropArea.cropRect == null) {
+      _state.cropArea.initSizes(
+        bounds: _state.imageContainingRect,
+        center: Offset(size.width / 2, size.height / 2),
+        height: 100.0,
+        width: 100.0,
+      );
     }
 
-    canvas.drawRect(_state.cropRect, paintBackground);
-
+    canvas.drawRect(_state.cropArea.cropRect, paintBackground);
     final points = <Offset>[
-      _state.cropRect.topLeft,
-      _state.cropRect.topRight,
-      _state.cropRect.bottomLeft,
-      _state.cropRect.bottomRight
+      _state.cropArea.cropRect.topLeft,
+      _state.cropArea.cropRect.topRight,
+      _state.cropArea.cropRect.bottomLeft,
+      _state.cropArea.cropRect.bottomRight
     ];
 
     canvas.drawPoints(ui.PointMode.points, points, paintCorner);
