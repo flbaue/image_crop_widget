@@ -27,19 +27,45 @@ class ImageCropState extends State<ImageCrop> {
   /// Rotates the image clockwise by 90 degree.
   /// Completes when the rotation is done.
   Future<void> rotateImage() async {
-    var pictureRecorder = ui.PictureRecorder();
-    Canvas canvas = Canvas(pictureRecorder);
+    final image = _state.image;
+    ui.Image newImage;
+    var pixel = 0;
+    var attempts = 0;
 
-    canvas.rotate(pi / 2);
-    canvas.translate(-0, -_state.image.height.toDouble());
-    canvas.drawImage(_state.image, Offset.zero, Paint());
+    /// This loop is a very hacky workaround.
+    /// In on device tests, about 1 in 10 times, the picture.toImage method returned
+    /// a corrupted image object. So far, it is unclear why this happens.
+    ///
+    /// In case the image is corrupted, two possibilities have been observed:
+    /// 1. All bytes of the image are 0.
+    /// 2. An index out of bounds exception was thrown when accessing a high index.
+    ///
+    /// Usually, this behavior was observed on the first attempt to call this rotateImage method
+    /// after the widget was build. Following calls to this method never or rarely produced this issue.
+    do {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
 
-    final image = await pictureRecorder
-        .endRecording()
-        .toImage(_state.image.height, _state.image.width);
+      canvas.rotate(pi / 2.0);
+      canvas.translate(0.0, -image.height.toDouble());
+      canvas.drawImage(image, Offset.zero, Paint());
+
+      final picture = recorder.endRecording();
+      newImage = await picture.toImage(image.height, image.width);
+      picture.dispose();
+
+      final newByteData = await newImage.toByteData();
+      try {
+        pixel = newByteData.getUint8(newByteData.lengthInBytes - 1);
+      } catch (e) {
+        print(e);
+      }
+
+      attempts++;
+    } while (pixel == 0 && attempts < 4);
 
     setState(() {
-      _state.image = image;
+      _state.image = newImage;
     });
   }
 
@@ -83,6 +109,7 @@ class ImageCropState extends State<ImageCrop> {
       imageCropRect.width.toInt(),
       imageCropRect.height.toInt(),
     );
+    picture.dispose();
 
     return croppedImage;
   }
